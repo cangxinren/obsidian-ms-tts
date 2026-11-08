@@ -1,0 +1,46 @@
+{
+  "name": "obsidian-ms-tts",
+  "version": "0.2.0",
+  "description": "Read Obsidian notes aloud with Microsoft Edge free voices, Doubao/Volcengine, and OpenAI-compatible TTS.",
+  "main": "main.js",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "cangxinren",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cangxinren/obsidian-ms-tts.git"
+  },
+  "homepage": "https://github.com/cangxinren/obsidian-ms-tts#readme",
+  "bugs": {
+    "url": "https://github.com/cangxinren/obsidian-ms-tts/issues"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "tts",
+    "text-to-speech",
+    "edge-tts",
+    "doubao",
+    "cosyvoice"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "check": "tsc -noEmit -skipLibCheck",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "devDependencies": {
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.5",
+    "@types/node": "^22.13.10",
+    "@types/ws": "^8.18.2",
+    "esbuild": "0.28.2",
+    "obsidian": "latest",
+    "tslib": "^2.8.1",
+    "typescript": "6.0.3",
+    "ws": "^8.22.1"
+  }
+}

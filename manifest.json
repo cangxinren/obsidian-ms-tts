@@ -1,0 +1,10 @@
+{
+  "id": "ms-tts-reader",
+  "name": "微软语音朗读",
+  "version": "0.2.0",
+  "minAppVersion": "1.5.0",
+  "description": "Read notes aloud with Microsoft Edge free voices, Doubao/Volcengine, and OpenAI-compatible TTS. Voice, rate, pitch, highlight, cache and audio export.",
+  "author": "cangxinren",
+  "authorUrl": "https://github.com/cangxinren",
+  "isDesktopOnly": true
+}

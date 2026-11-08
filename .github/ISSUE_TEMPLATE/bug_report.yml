@@ -1,0 +1,57 @@
+name: Bug report
+description: 报告朗读、高亮、缓存或导出问题
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请勿粘贴 API Key、Access Token 或笔记隐私内容。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 发生了什么？预期是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开笔记 ...
+        2. 执行命令 ...
+        3. 出现 ...
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: 语音引擎
+      options:
+        - 微软 Edge 免费语音
+        - 豆包 / 火山引擎
+        - OpenAI 兼容 / 硅基流动
+        - Windows 系统语音
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian 版本与系统
+      placeholder: 1.15.0 / Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 报错信息
+      description: 开发者工具 Console 或状态栏提示（请注意脱敏）
+      render: text
