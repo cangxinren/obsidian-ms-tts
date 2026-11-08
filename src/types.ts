@@ -64,6 +64,13 @@ export interface MsTtsSettings {
   activePlaylistId: string;
   autoFolderPlaylist: boolean;
   playlistIncludeSubfolders: boolean;
+
+  // 合并导出
+  exportIncludeLyrics: boolean;
+  exportEmbedLyrics: boolean;
+  exportAnnounceTitles: boolean;
+  /** 空字符串 = 附件目录；'/' = 库根目录；其他 = 指定目录 */
+  exportFolder: string;
 }
 
 export interface VoiceOption {

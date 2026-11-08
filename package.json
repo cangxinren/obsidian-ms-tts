@@ -1,6 +1,6 @@
 {
   "name": "obsidian-ms-tts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Read Obsidian notes aloud with Microsoft Edge free voices, Doubao/Volcengine, and OpenAI-compatible TTS.",
   "main": "main.js",
   "private": true,

@@ -315,3 +315,97 @@
   font-size: var(--font-ui-small);
   line-height: 1.6;
 }
+
+/* 合并导出 */
+
+.ms-tts-export-modal .ms-tts-export-hint {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.ms-tts-export-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 32vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 8px;
+}
+
+.ms-tts-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.ms-tts-export-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+}
+
+.ms-tts-export-action-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ms-tts-export-subfolder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: 8px;
+}
+
+.ms-tts-export-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: 10px;
+}
+
+.ms-tts-export-textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  margin-bottom: 8px;
+  font-family: var(--font-text);
+}
+
+.ms-tts-export-progress-text {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  margin-bottom: 8px;
+}
+
+.ms-tts-export-result-title {
+  font-weight: 600;
+  font-size: var(--font-ui-medium);
+  margin-bottom: 10px;
+}
+
+.ms-tts-export-result-row {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-small);
+}
+
+.ms-tts-export-result-label {
+  flex-shrink: 0;
+  width: 3em;
+  color: var(--text-muted);
+}
+
+.ms-tts-export-result-value {
+  flex: 1;
+  min-width: 0;
+  user-select: text;
+  word-break: break-all;
+}

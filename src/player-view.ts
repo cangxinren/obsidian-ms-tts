@@ -69,6 +69,12 @@ export class PlayerView extends ItemView {
     this.nextButton = controls.createEl('button', { attr: { 'aria-label': '下一段' } });
     setIcon(this.nextButton, 'skip-forward');
 
+    const exportButton = controls.createEl('button', {
+      attr: { 'aria-label': '导出音频（整篇 / 批量 / 自定义）' },
+    });
+    setIcon(exportButton, 'download');
+    exportButton.onclick = () => this.plugin.openExportModal();
+
     const playlistControls = root.createDiv({ cls: 'ms-tts-playlist-controls' });
     this.prevNoteButton = playlistControls.createEl('button', { attr: { 'aria-label': '上一篇笔记' } });
     setIcon(this.prevNoteButton, 'chevrons-left');

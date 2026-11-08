@@ -20,6 +20,7 @@ import { clearEditorHighlight, highlightEditor, highlightField } from './highlig
 import { buildReadableDoc } from './text-extract';
 import { PlayerView, VIEW_TYPE_MS_TTS_PLAYER } from './player-view';
 import { exportDocAudio } from './exporter';
+import { ExportAudioModal } from './export-modal';
 import { describeError } from './errors';
 import { clamp } from './util';
 import { PLAYBACK_MODE_LABELS, PlaylistController } from './playlist';
@@ -422,6 +423,12 @@ export default class MsTtsPlugin extends Plugin {
         void this.exportCurrent();
         return true;
       },
+    });
+
+    this.addCommand({
+      id: 'export-merged-audio',
+      name: '导出音频（整篇 / 批量 / 自定义）',
+      callback: () => this.openExportModal(),
     });
 
     this.addCommand({
@@ -959,6 +966,12 @@ export default class MsTtsPlugin extends Plugin {
     if (!leaf) return;
     await leaf.setViewState({ type: VIEW_TYPE_MS_TTS_PLAYER, active: true });
     await this.app.workspace.revealLeaf(leaf);
+  }
+
+  openExportModal(initialPaths?: string[]): void {
+    const file = this.getCurrentNoteFile();
+    const paths = initialPaths ?? (file ? [file.path] : []);
+    new ExportAudioModal(this.app, this, paths).open();
   }
 
   private async exportCurrent(): Promise<void> {

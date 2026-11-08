@@ -40,4 +40,9 @@ export const DEFAULT_SETTINGS: MsTtsSettings = {
   activePlaylistId: '',
   autoFolderPlaylist: false,
   playlistIncludeSubfolders: false,
+
+  exportIncludeLyrics: true,
+  exportEmbedLyrics: true,
+  exportAnnounceTitles: true,
+  exportFolder: '',
 };

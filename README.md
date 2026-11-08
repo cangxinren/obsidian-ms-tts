@@ -5,9 +5,9 @@
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.5.0%2B-7C3AED)](https://obsidian.md)
 [![Desktop only](https://img.shields.io/badge/platform-desktop-blue)](#已知限制)
 
-用 **微软 Edge 免费语音**、**豆包 / 火山引擎** 或 **任意 OpenAI 兼容 TTS** 朗读 Obsidian 笔记。支持选择语音、语速、音调，逐句高亮跟随、音频缓存、侧边栏播放器与整篇音频导出。
+用 **微软 Edge 免费语音**、**豆包 / 火山引擎** 或 **任意 OpenAI 兼容 TTS** 朗读 Obsidian 笔记。支持选择语音、语速、音调，逐句高亮跟随、音频缓存、侧边栏播放器、播放列表，以及把整篇 / 批量 / 自定义文本合并导出为一个带歌词的音频文件。
 
-> Read your Obsidian notes aloud with free Microsoft Edge voices, Doubao/Volcengine, or any OpenAI-compatible TTS. Voice selection, speech rate, pitch, sentence highlighting, audio cache and MP3/WAV export. Desktop only.
+> Read your Obsidian notes aloud with free Microsoft Edge voices, Doubao/Volcengine, or any OpenAI-compatible TTS. Voice selection, speech rate, pitch, sentence highlighting, audio cache, playlists, and merged MP3/WAV export with LRC and embedded lyrics. Desktop only.
 
 ## 功能
 
@@ -20,6 +20,8 @@
 - 自定义播放列表：多份命名列表、手动添加、文件夹导入、多选笔记，播放时自动打开下一篇笔记
 - 音频缓存（IndexedDB，不进入笔记库、不随 OneDrive 同步）
 - 导出整篇为 MP3（接口返回 WAV 时自动导出 WAV）
+- 合并导出：整篇 / 多选笔记 / 文件夹 / 播放列表 / 自定义文本 → 一个音频文件
+- 歌词：同目录 `.lrc` + MP3 内嵌 ID3（标题、艺术家、时长、USLT/SYLT），可直接拷到其他播放器
 - 接口失败、断网或未配置密钥时自动切换 Windows 系统语音
 
 ## 引擎对比
@@ -102,7 +104,8 @@ powershell -NoProfile -File .\scripts\deploy.ps1 -Vault "<你的库路径>"
 | 管理播放列表 | 新建、重命名、排序、导入文件夹、多选笔记 |
 | 用当前笔记所在文件夹生成播放列表 | 把同文件夹的 Markdown 笔记批量成列 |
 | 播放下一条 / 上一条笔记 | 手动切篇 |
-| 导出当前笔记为音频 | 合成整篇并保存到附件目录 |
+| 导出当前笔记为音频 | 快速合成当前整篇并保存（仅音频） |
+| 导出音频（整篇 / 批量 / 自定义） | 打开合并导出弹窗，可混合多个来源并生成歌词 |
 | 试听当前语音 | 用当前参数朗读一句示例 |
 
 左侧 ribbon 的喇叭图标可直接朗读当前笔记；状态栏显示当前段进度，点击可暂停 / 继续。
@@ -123,6 +126,26 @@ powershell -NoProfile -File .\scripts\deploy.ps1 -Vault "<你的库路径>"
 4. 播放列表管理 →「多选笔记」批量挑选，或命令「用当前笔记所在文件夹生成播放列表」。
 
 设置里可开启「自动用所在文件夹成列」：朗读一篇不在列表中的笔记时，自动把同文件夹的笔记作为临时队列。顺序 / 列表循环模式会连续播放，并在需要时自动打开下一篇笔记；随机模式播完整个列表后停止。
+
+### 合并导出与歌词
+
+命令「导出音频（整篇 / 批量 / 自定义）」或播放器面板的下载按钮会打开导出弹窗：
+
+1. 用「当前笔记」「多选笔记」「导入文件夹」「当前播放列表」或「添加自定义文本」把来源加入队列；可上移 / 下移 / 删除，笔记按路径自动去重。
+2. 设置文件名、保存目录，以及是否生成 `.lrc`、是否内嵌到 MP3、是否朗读每篇标题。
+3. 点击「开始导出」，所有来源会按顺序合成为一个音频文件。
+
+产物：
+
+- 音频：`<文件名>-朗读-<时间>.mp3` 或 `.wav`；默认放在 Obsidian 附件目录。
+- 歌词：同名 `.lrc`（UTF-8），主流播放器会自动加载。
+- 内嵌：MP3 会写入 ID3v2.3 的标题、艺术家、专辑、时长，以及 `USLT`（整段歌词）与 `SYLT`（逐句同步歌词）；WAV 不支持内嵌，只生成 `.lrc`。
+
+说明：
+
+- 多篇合并默认在每篇开头朗读「《标题》」，形成自然章节；关闭后只在歌词里插入 `【标题】` 行。
+- 歌词的段间时间来自每段真实音频时长；段内句子按字符权重估算，通常误差 1–2 秒。设置里开启「逐句合成」后可精确到句（请求数会增加）。
+- 不同笔记的音频格式必须一致；若接口返回 MP3/WAV 混合内容，会直接报错而不是生成损坏文件。
 
 ## 各引擎配置
 
@@ -176,6 +199,9 @@ powershell -NoProfile -File .\scripts\deploy.ps1 -Vault "<你的库路径>"
 - 阅读模式无法在正文内高亮（没有 CodeMirror 编辑器），只在播放器面板显示当前句；正文内高亮请使用编辑 / 实时预览模式。
 - 播放列表自动续播时会自动打开下一篇笔记，当前编辑界面会随之切换；如需停留原笔记，请使用「单篇循环」或停止播放。
 - 导出 MP3 依赖各段 MP3 帧拼接；若接口返回 WAV，会自动改为 WAV 导出。
+- 合并导出不做重编码：不同采样率 / 码率的 MP3 直接串联，由播放器处理；WAV 各段参数不一致时会报错。
+- 歌词句内时间是按字符权重估算；需要精确到句请开启「逐句合成」。
+- WAV 不支持内嵌歌词，仅生成 `.lrc`；Windows 系统语音不支持导出音频。
 
 ## 开发
 
@@ -195,9 +221,12 @@ npm run build   # 类型检查 + 生产构建
 - `src/player.ts`：播放状态机、预取、逐句计时、自然播完回调
 - `src/playlist.ts`：播放模式、播放队列、随机顺序、列表增删改
 - `src/playlist-modal.ts`：播放列表管理、多选笔记、文件夹选择
+- `src/export-modal.ts`：合并导出弹窗、来源队列、自定义文本输入
 - `src/text-extract.ts`：Markdown 清洗与分块
 - `src/highlighter.ts`：CodeMirror 高亮
-- `src/exporter.ts`：整篇导出与 MP3/WAV 拼接
+- `src/exporter.ts`：导出队列、MP3/WAV 拼接、文件写入
+- `src/audio-meta.ts`：MP3 帧解析、WAV `fmt`/`data` 解析、时长估算
+- `src/lyrics.ts`：LRC 生成、ID3v2.3（USLT/SYLT）写入
 
 `scripts/edge-tts-test.mjs` 可在 Node 下单独验证 Edge 鉴权与合成（需要 `ws` 依赖）。
 
