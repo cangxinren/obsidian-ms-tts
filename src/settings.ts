@@ -34,4 +34,10 @@ export const DEFAULT_SETTINGS: MsTtsSettings = {
   keyStorage: 'local',
   openPanelOnPlay: true,
   showStatusBar: true,
+
+  playbackMode: 'sequential',
+  playlists: [],
+  activePlaylistId: '',
+  autoFolderPlaylist: false,
+  playlistIncludeSubfolders: false,
 };

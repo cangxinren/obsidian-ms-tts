@@ -73,6 +73,7 @@ export class Player {
   private requests = 0;
   private usingSystem = false;
   private errorMessage: string | undefined;
+  private onDocEnded: (() => boolean | Promise<boolean>) | null = null;
 
   constructor(private readonly deps: PlayerDeps) {
     this.audio = new Audio();
@@ -81,6 +82,11 @@ export class Player {
 
   on<K extends keyof EmitterMap>(event: K, callback: EmitterMap[K]): () => void {
     return this.emitter.on(event, callback);
+  }
+
+  /** 文档自然播完时回调；返回 true 表示已由外部接管（例如播放列表续播），不再进入 idle。 */
+  setDocEndHandler(handler: (() => boolean | Promise<boolean>) | null): void {
+    this.onDocEnded = handler;
   }
 
   getSnapshot(): PlayerSnapshot {
@@ -213,7 +219,7 @@ export class Player {
 
         this.advance();
       }
-      if (this.gen === myGen) this.finish(myGen);
+      if (this.gen === myGen) await this.finish(myGen);
     } catch (error) {
       if (this.gen !== myGen) return;
       const ttsError = error instanceof TtsError ? error : new TtsError('unknown', describeError(error));
@@ -257,7 +263,7 @@ export class Player {
         if (this.gen !== myGen) return;
         this.advance();
       }
-      if (this.gen === myGen) this.finish(myGen);
+      if (this.gen === myGen) await this.finish(myGen);
     } catch (error) {
       if (this.gen !== myGen) return;
       this.fail(new TtsError('playback', describeError(error)), myGen);
@@ -405,9 +411,26 @@ export class Player {
     if (nextChunk) this.emitter.emit('sentence', nextChunk.sentences[0] ?? null);
   }
 
-  private finish(myGen: number): void {
+  private async finish(myGen: number): Promise<void> {
     if (this.gen !== myGen) return;
     this.stopInternal();
+
+    if (this.onDocEnded) {
+      // 补间期先显示 loading，避免用户误点暂停或看到旧标题仍为“正在播放”
+      this.setState('loading');
+      let handled = false;
+      try {
+        handled = await this.onDocEnded();
+      } catch (error) {
+        this.emitter.emit('error', error instanceof Error ? error : new Error(String(error)));
+        handled = false;
+      }
+      if (handled) return;
+    }
+
+    // 等待续播期间用户可能已经 stop() 或开始新的朗读，此时不要覆盖最新状态
+    if (this.gen !== myGen + 1) return;
+
     this.state = 'idle';
     this.emitter.emit('sentence', null);
     this.emitSnapshot();
