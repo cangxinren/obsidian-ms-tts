@@ -1,10 +1,12 @@
-import { MarkdownView, Notice, Plugin } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile, TFolder } from 'obsidian';
 import type { Editor } from 'obsidian';
 import { DEFAULT_SETTINGS } from './settings';
 import { MsTtsSettingsTab } from './settings-tab';
 import type {
   KeyStorage,
   MsTtsSettings,
+  PlaybackMode,
+  Playlist,
   PlayerSnapshot,
   ProviderId,
   SecretName,
@@ -20,6 +22,8 @@ import { PlayerView, VIEW_TYPE_MS_TTS_PLAYER } from './player-view';
 import { exportDocAudio } from './exporter';
 import { describeError } from './errors';
 import { clamp } from './util';
+import { PLAYBACK_MODE_LABELS, PlaylistController } from './playlist';
+import { PlaylistManagerModal, PlaylistPickerModal } from './playlist-modal';
 
 const SECRET_PREFIX = 'ms-tts-reader:secret:';
 const VOICES_PREFIX = 'ms-tts-reader:voices:';
@@ -30,6 +34,7 @@ export default class MsTtsPlugin extends Plugin {
   cache!: AudioCache;
   player!: Player;
   tts!: TtsService;
+  playlist!: PlaylistController;
 
   private sessionSecrets: Record<SecretName, string> = { doubao: '', openai: '' };
   private statusBarEl: HTMLElement | null = null;
@@ -55,6 +60,16 @@ export default class MsTtsPlugin extends Plugin {
       cache: this.cache,
     });
 
+    this.playlist = new PlaylistController({
+      app: this.app,
+      settings: () => this.settings,
+      save: () => this.saveSettings(),
+      player: this.player,
+      openNoteForReading: (path) => this.openNoteForReading(path),
+      notify: (message) => new Notice(message, 5000),
+    });
+    this.player.setDocEndHandler(() => this.playlist.handleDocEnded());
+
     this.registerEditorExtension(highlightField);
     this.registerView(VIEW_TYPE_MS_TTS_PLAYER, (leaf) => new PlayerView(leaf, this.player, this));
     this.addSettingTab(new MsTtsSettingsTab(this.app, this));
@@ -64,6 +79,8 @@ export default class MsTtsPlugin extends Plugin {
     });
 
     this.registerCommands();
+    this.registerFileMenu();
+    this.registerVaultEvents();
     this.setupStatusBar();
     this.wirePlayerEvents();
     this.loadCachedVoices();
@@ -91,7 +108,62 @@ export default class MsTtsPlugin extends Plugin {
     this.settings.volume = clamp(this.settings.volume, 0, 100);
     this.settings.chunkChars = clamp(this.settings.chunkChars, 120, 800);
     this.settings.cacheMaxMB = clamp(this.settings.cacheMaxMB, 50, 1000);
+    this.normalizePlaylists();
     this.cleanupLegacySettings();
+  }
+
+  /** 兼容旧配置：清理非法列表、去重条目、修正 activePlaylistId */
+  private normalizePlaylists(): void {
+    const raw = this.settings.playlists as unknown;
+    const source = Array.isArray(raw) ? raw : [];
+    const seenLists = new Set<string>();
+
+    const playlists: Playlist[] = [];
+    for (const entry of source as Array<Partial<Playlist> | null | undefined>) {
+      if (!entry || typeof entry !== 'object') continue;
+      if (typeof entry.id !== 'string' || !entry.id || seenLists.has(entry.id)) continue;
+      if (typeof entry.name !== 'string' || !entry.name.trim()) continue;
+      seenLists.add(entry.id);
+
+      const seenItems = new Set<string>();
+      const items: Playlist['items'] = [];
+      if (Array.isArray(entry.items)) {
+        for (const item of entry.items) {
+          if (!item || typeof item.path !== 'string' || !item.path) continue;
+          if (seenItems.has(item.path)) continue;
+          seenItems.add(item.path);
+          items.push({
+            path: item.path,
+            title:
+              typeof item.title === 'string' && item.title
+                ? item.title
+                : (item.path.split('/').pop() ?? item.path).replace(/\.md$/i, ''),
+          });
+        }
+      }
+
+      playlists.push({
+        id: entry.id,
+        name: entry.name,
+        items,
+        createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : Date.now(),
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      });
+    }
+
+    this.settings.playlists = playlists;
+    if (!playlists.some((list) => list.id === this.settings.activePlaylistId)) {
+      this.settings.activePlaylistId = playlists[0]?.id ?? '';
+    }
+    if (!['sequential', 'repeat-one', 'repeat-all', 'shuffle'].includes(this.settings.playbackMode)) {
+      this.settings.playbackMode = 'sequential';
+    }
+    if (typeof this.settings.autoFolderPlaylist !== 'boolean') {
+      this.settings.autoFolderPlaylist = false;
+    }
+    if (typeof this.settings.playlistIncludeSubfolders !== 'boolean') {
+      this.settings.playlistIncludeSubfolders = false;
+    }
   }
 
   /** 移除 0.1.x 的 Azure 配置与密钥残留 */
@@ -282,6 +354,7 @@ export default class MsTtsPlugin extends Plugin {
           info.baseOffset,
           view.file?.path ?? null,
           view,
+          true,
         );
         return true;
       },
@@ -323,6 +396,7 @@ export default class MsTtsPlugin extends Plugin {
       name: '停止朗读',
       callback: () => {
         this.player.stop();
+        this.playlist.invalidate();
         this.readingPath = null;
       },
     });
@@ -356,6 +430,73 @@ export default class MsTtsPlugin extends Plugin {
       callback: () => {
         void this.previewVoice();
       },
+    });
+
+    this.addCommand({
+      id: 'play-playlist',
+      name: '播放当前播放列表',
+      callback: () => {
+        const list = this.playlist.getActiveList();
+        if (!list) {
+          new Notice('还没有播放列表，请先添加笔记');
+          return;
+        }
+        this.playlist.playPlaylist(list.id);
+      },
+    });
+
+    this.addCommand({
+      id: 'toggle-playback-mode',
+      name: '切换播放模式',
+      callback: () => this.togglePlaybackMode(),
+    });
+
+    this.addCommand({
+      id: 'add-to-playlist',
+      name: '将当前笔记加入播放列表',
+      checkCallback: (checking) => {
+        const file = this.getCurrentNoteFile();
+        if (checking) return !!file;
+        if (!file) {
+          new Notice('请先打开一篇笔记');
+          return false;
+        }
+        this.promptAddToPlaylist([file.path]);
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'manage-playlists',
+      name: '管理播放列表',
+      callback: () => this.openPlaylistManager(),
+    });
+
+    this.addCommand({
+      id: 'playlist-from-folder',
+      name: '用当前笔记所在文件夹生成播放列表',
+      checkCallback: (checking) => {
+        const file = this.getCurrentNoteFile();
+        if (checking) return !!file;
+        if (!file) {
+          new Notice('请先打开一篇笔记');
+          return false;
+        }
+        this.createPlaylistFromFolder(file);
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'next-note',
+      name: '播放下一条笔记',
+      callback: () => this.playlist.nextNote(),
+    });
+
+    this.addCommand({
+      id: 'prev-note',
+      name: '播放上一条笔记',
+      callback: () => this.playlist.prevNote(),
     });
   }
 
@@ -395,7 +536,7 @@ export default class MsTtsPlugin extends Plugin {
       perSentence: false,
       title: '语音试听',
     });
-    await this.player.playDoc(doc, 0);
+    this.playlist.startSingle(doc, { title: '语音试听', path: null, source: 'partial' });
   }
 
   private async readFromCursor(editor: Editor): Promise<void> {
@@ -413,6 +554,7 @@ export default class MsTtsPlugin extends Plugin {
       offset,
       view.file?.path ?? null,
       view,
+      true,
     );
   }
 
@@ -422,6 +564,7 @@ export default class MsTtsPlugin extends Plugin {
     baseOffset: number,
     path: string | null,
     view: MarkdownView | null,
+    partial = false,
   ): Promise<void> {
     const doc = buildReadableDoc(text, {
       chunkChars: this.settings.chunkChars,
@@ -441,7 +584,16 @@ export default class MsTtsPlugin extends Plugin {
     this.readingView = view;
     this.readingEditor = view && view.getMode() === 'source' ? view.editor : null;
     if (this.settings.openPanelOnPlay) void this.activatePlayerView();
-    await this.player.playDoc(doc, 0);
+
+    if (partial || !path) {
+      this.playlist.startSingle(doc, {
+        title,
+        path,
+        source: partial ? 'partial' : 'single',
+      });
+    } else {
+      this.playlist.startFromNote(path, doc, title);
+    }
   }
 
   private ensureSystemVoice(): void {
@@ -497,11 +649,210 @@ export default class MsTtsPlugin extends Plugin {
     return null;
   }
 
+  // ---------- 播放列表辅助 ----------
+
+  openPlaylistManager(): void {
+    new PlaylistManagerModal(this.app, this).open();
+  }
+
+  togglePlaybackMode(): void {
+    const mode = this.playlist.cycleMode();
+    new Notice(`播放模式：${PLAYBACK_MODE_LABELS[mode]}`);
+  }
+
+  setPlaybackMode(mode: PlaybackMode): void {
+    this.playlist.setMode(mode);
+  }
+
+  getCurrentNoteFile(): TFile | null {
+    const view = this.getActiveView();
+    if (view?.file) return view.file;
+    const active = this.app.workspace.getActiveFile();
+    return active && active.extension.toLowerCase() === 'md' ? active : null;
+  }
+
+  /** 播放列表续播时打开/定位目标笔记，并返回可用于构建文档的文本 */
+  private async openNoteForReading(
+    path: string,
+  ): Promise<{ text: string; title: string } | null> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== 'md') return null;
+
+    const active = this.findActiveMarkdownView();
+    if (active?.file?.path === path) {
+      this.lastMarkdownView = active;
+      this.readingPath = path;
+      this.readingView = active;
+      this.readingEditor = active.getMode() === 'source' ? active.editor : null;
+      return { text: active.getViewData(), title: active.file?.basename ?? file.basename };
+    }
+
+    const current = this.readingView;
+    if (current?.file?.path === path) {
+      this.lastMarkdownView = current;
+      this.readingPath = path;
+      this.readingEditor = current.getMode() === 'source' ? current.editor : null;
+      return { text: current.getViewData(), title: current.file?.basename ?? file.basename };
+    }
+
+    let leaf = current?.leaf;
+    if (!leaf || !(leaf.view instanceof MarkdownView)) {
+      const leaves = this.app.workspace.getLeavesOfType('markdown');
+      const reusable =
+        leaves.find(
+          (item) => item.view instanceof MarkdownView && item.view.file?.path === path,
+        ) ?? leaves.find((item) => item.view instanceof MarkdownView);
+      leaf = reusable ?? this.app.workspace.getLeaf('tab');
+    }
+    if (!leaf) return null;
+
+    this.readingPath = path;
+    this.clearHighlight();
+    try {
+      await leaf.openFile(file);
+      await this.app.workspace.revealLeaf(leaf);
+    } catch (error) {
+      this.readingPath = null;
+      new Notice(`打开笔记失败：${describeError(error)}`);
+      return null;
+    }
+
+    const view = leaf.view instanceof MarkdownView ? leaf.view : null;
+    if (view) {
+      this.lastMarkdownView = view;
+      this.readingView = view;
+      this.readingEditor = view.getMode() === 'source' ? view.editor : null;
+    }
+    const text = await this.app.vault.cachedRead(file);
+    return { text, title: file.basename };
+  }
+
+  /** 从文件浏览器/命令直接播放某篇笔记 */
+  async playFile(file: TFile): Promise<void> {
+    try {
+      const active = this.getActiveView();
+      const leaf = active?.leaf ?? this.app.workspace.getLeaf('tab');
+      this.clearHighlight();
+      await leaf.openFile(file);
+      await this.app.workspace.revealLeaf(leaf);
+      const view = leaf.view instanceof MarkdownView ? leaf.view : null;
+      const text = await this.app.vault.cachedRead(file);
+      await this.beginReading(text, file.basename, 0, file.path, view);
+    } catch (error) {
+      new Notice(`无法播放：${describeError(error)}`);
+    }
+  }
+
+  private registerFileMenu(): void {
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (file instanceof TFile && file.extension.toLowerCase() === 'md') {
+          const target = file;
+          menu.addItem((item) =>
+            item
+              .setTitle('添加到播放列表…')
+              .setIcon('list-plus')
+              .onClick(() => this.promptAddToPlaylist([target.path])),
+          );
+          menu.addItem((item) =>
+            item
+              .setTitle('从这篇笔记开始播放')
+              .setIcon('play')
+              .onClick(() => {
+                void this.playFile(target);
+              }),
+          );
+        } else if (file instanceof TFolder) {
+          const target = file;
+          menu.addItem((item) =>
+            item
+              .setTitle('将文件夹加入播放列表…')
+              .setIcon('folder-plus')
+              .onClick(() => this.promptAddFolderToPlaylist(target)),
+          );
+        }
+      }),
+    );
+  }
+
+  private registerVaultEvents(): void {
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => {
+        this.playlist.handleRename(oldPath, file.path);
+      }),
+    );
+    this.registerEvent(
+      this.app.vault.on('delete', () => {
+        this.playlist.handleDelete();
+      }),
+    );
+  }
+
+  private promptAddToPlaylist(paths: string[]): void {
+    const lists = this.playlist.getLists();
+    if (!lists.length) {
+      const list = this.playlist.createList('默认列表');
+      const added = this.playlist.addPathsTo(list.id, paths);
+      new Notice(added ? `已加入「${list.name}」` : '没有新增笔记');
+      return;
+    }
+    if (lists.length === 1) {
+      const list = lists[0];
+      const added = this.playlist.addPathsTo(list.id, paths);
+      new Notice(added ? `已加入「${list.name}」` : '所选笔记已在列表中');
+      return;
+    }
+    new PlaylistPickerModal(this.app, lists, (list) => {
+      const added = this.playlist.addPathsTo(list.id, paths);
+      new Notice(added ? `已加入「${list.name}」` : '所选笔记已在列表中');
+    }).open();
+  }
+
+  private promptAddFolderToPlaylist(folder: TFolder): void {
+    const paths = this.playlist
+      .buildFolderQueue(folder.path, this.settings.playlistIncludeSubfolders)
+      .map((item) => item.path);
+    if (!paths.length) {
+      new Notice('文件夹里没有 Markdown 笔记');
+      return;
+    }
+
+    const addTo = (list: Playlist): void => {
+      const added = this.playlist.addPathsTo(list.id, paths);
+      new Notice(added ? `已加入 ${added} 篇到「${list.name}」` : '这些笔记已在列表中');
+    };
+
+    const lists = this.playlist.getLists();
+    if (!lists.length) {
+      addTo(this.playlist.createList('默认列表'));
+      return;
+    }
+    if (lists.length === 1) {
+      addTo(lists[0]);
+      return;
+    }
+    new PlaylistPickerModal(this.app, lists, addTo).open();
+  }
+
+  private createPlaylistFromFolder(file: TFile): void {
+    const folder = file.parent;
+    const name = folder && folder.path !== '/' ? folder.name : '库根目录';
+    const list = this.playlist.createList(name);
+    const added = this.playlist.addFolderTo(
+      list.id,
+      folder?.path ?? '/',
+      this.settings.playlistIncludeSubfolders,
+    );
+    new Notice(`已生成「${list.name}」，共 ${added} 篇`);
+    this.openPlaylistManager();
+  }
+
   // ---------- 播放器事件与高亮 ----------
 
   private wirePlayerEvents(): void {
     this.player.on('snapshot', (snapshot) => {
       this.renderStatusBar(snapshot);
+      if (snapshot.state === 'stopped') this.playlist.invalidate();
       if (snapshot.state === 'idle' || snapshot.state === 'stopped' || snapshot.state === 'error') {
         this.readingPath = null;
         this.clearHighlight();
@@ -533,6 +884,9 @@ export default class MsTtsPlugin extends Plugin {
   private onActiveLeafChange(): void {
     const active = this.findActiveMarkdownView();
     if (active) this.lastMarkdownView = active;
+
+    // 播放列表自动切篇期间不要把它误判为用户切换笔记
+    if (this.playlist?.isAdvancing()) return;
 
     if (!this.readingPath) return;
     // 播放器面板成为活动视图时不要停止朗读
@@ -577,8 +931,13 @@ export default class MsTtsPlugin extends Plugin {
         return;
       }
       const current = Math.min(snapshot.chunkIndex + 1, snapshot.chunkCount);
+      const queue = this.playlist?.getSnapshot();
+      const listPart =
+        queue && queue.count > 1 && queue.source !== 'partial'
+          ? `${queue.index + 1}/${queue.count} · `
+          : '';
       element.setText(
-        `🎧 ${current}/${snapshot.chunkCount}${snapshot.state === 'paused' ? ' · 已暂停' : ''}`,
+        `🎧 ${listPart}${current}/${snapshot.chunkCount}${snapshot.state === 'paused' ? ' · 已暂停' : ''}`,
       );
       element.addClass('is-active');
     } else {

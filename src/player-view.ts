@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type { Player } from './player';
 import type { PlayerSnapshot } from './types';
 import type MsTtsPlugin from './main';
+import { PLAYBACK_MODE_ICONS, PLAYBACK_MODE_LABELS } from './playlist';
 
 export const VIEW_TYPE_MS_TTS_PLAYER = 'ms-tts-player';
 
@@ -15,6 +16,11 @@ export class PlayerView extends ItemView {
   private playButton!: HTMLButtonElement;
   private prevButton!: HTMLButtonElement;
   private nextButton!: HTMLButtonElement;
+  private prevNoteButton!: HTMLButtonElement;
+  private nextNoteButton!: HTMLButtonElement;
+  private modeButton!: HTMLButtonElement;
+  private playlistButton!: HTMLButtonElement;
+  private playlistEl!: HTMLElement;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -63,17 +69,35 @@ export class PlayerView extends ItemView {
     this.nextButton = controls.createEl('button', { attr: { 'aria-label': '下一段' } });
     setIcon(this.nextButton, 'skip-forward');
 
+    const playlistControls = root.createDiv({ cls: 'ms-tts-playlist-controls' });
+    this.prevNoteButton = playlistControls.createEl('button', { attr: { 'aria-label': '上一篇笔记' } });
+    setIcon(this.prevNoteButton, 'chevrons-left');
+    this.modeButton = playlistControls.createEl('button', {
+      cls: 'ms-tts-mode-button',
+      attr: { 'aria-label': '切换播放模式' },
+    });
+    this.playlistButton = playlistControls.createEl('button', { attr: { 'aria-label': '管理播放列表' } });
+    setIcon(this.playlistButton, 'list-music');
+    this.nextNoteButton = playlistControls.createEl('button', { attr: { 'aria-label': '下一篇笔记' } });
+    setIcon(this.nextNoteButton, 'chevrons-right');
+
     this.counterEl = root.createDiv({ cls: 'ms-tts-counter' });
+    this.playlistEl = root.createDiv({ cls: 'ms-tts-playlist-status' });
     this.metaEl = root.createDiv({ cls: 'ms-tts-meta' });
 
     this.prevButton.onclick = () => this.player.prev();
     this.nextButton.onclick = () => this.player.next();
     stopButton.onclick = () => this.player.stop();
     this.playButton.onclick = () => this.togglePlay();
+    this.prevNoteButton.onclick = () => this.plugin.playlist.prevNote();
+    this.nextNoteButton.onclick = () => this.plugin.playlist.nextNote();
+    this.modeButton.onclick = () => this.plugin.togglePlaybackMode();
+    this.playlistButton.onclick = () => this.plugin.openPlaylistManager();
 
     this.unsubscribers.push(
       this.player.on('snapshot', (snapshot) => this.render(snapshot)),
       this.player.on('sentence', () => this.render(this.player.getSnapshot())),
+      this.plugin.playlist.onChange(() => this.render(this.player.getSnapshot())),
     );
 
     this.render(this.player.getSnapshot());
@@ -116,6 +140,28 @@ export class PlayerView extends ItemView {
     this.metaEl.setText(
       `${engineLabel}${detail ? ` · ${detail}` : ''} · 缓存命中 ${snapshot.cacheHits} · 请求 ${snapshot.requests}`,
     );
+
+    const playlist = this.plugin.playlist.getSnapshot();
+    const canSwitch = playlist.count > 1 && playlist.source !== 'partial';
+    this.prevNoteButton.disabled = !canSwitch || playlist.isAdvancing;
+    this.nextNoteButton.disabled = !canSwitch || playlist.isAdvancing;
+    setIcon(this.modeButton, PLAYBACK_MODE_ICONS[playlist.mode]);
+    const modeLabel = PLAYBACK_MODE_LABELS[playlist.mode];
+    this.modeButton.setAttribute('aria-label', `播放模式：${modeLabel}，点击切换`);
+    this.modeButton.title = `播放模式：${modeLabel}，点击切换`;
+
+    if (playlist.source === 'partial') {
+      this.playlistEl.setText(`单次播放 · ${modeLabel}`);
+    } else {
+      const sourceLabel =
+        playlist.source === 'playlist'
+          ? playlist.listName || '播放列表'
+          : playlist.source === 'folder'
+            ? '文件夹队列'
+            : '单篇';
+      const position = playlist.count > 1 ? ` · ${playlist.index + 1}/${playlist.count}` : '';
+      this.playlistEl.setText(`${sourceLabel}${position} · ${modeLabel}`);
+    }
 
     this.prevButton.disabled = !hasDocument;
     this.nextButton.disabled = !hasDocument;

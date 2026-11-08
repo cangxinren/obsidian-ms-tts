@@ -1,9 +1,10 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import type MsTtsPlugin from './main';
-import type { KeyStorage, MsTtsSettings, ProviderId, VoiceOption } from './types';
+import type { KeyStorage, MsTtsSettings, PlaybackMode, ProviderId, VoiceOption } from './types';
 import { describeError } from './errors';
 import { formatBytes } from './util';
 import { DOUBAO_VOICES, openAiVoiceOptions, voiceLabel } from './voices';
+import { PLAYBACK_MODE_LABELS, PLAYBACK_MODES } from './playlist';
 
 const CATEGORY_ORDER = ['新闻播报', '对话/教学', '有声书', '方言', '体育解说', '通用', '英文', '多语种', '其他语言'];
 
@@ -31,6 +32,7 @@ export class MsTtsSettingsTab extends PluginSettingTab {
     this.renderProviderSettings(containerEl);
     this.renderProsody(containerEl);
     this.renderPlayback(containerEl);
+    this.renderPlaylists(containerEl);
     this.renderCache(containerEl);
     this.renderSystem(containerEl);
     this.renderMisc(containerEl);
@@ -462,6 +464,37 @@ export class MsTtsSettingsTab extends PluginSettingTab {
     containerEl.createEl('h3', { text: '播放行为' });
 
     new Setting(containerEl)
+      .setName('播放模式')
+      .setDesc('顺序：播完列表停止；单篇循环：重复当前笔记；列表循环：列表末尾回到开头；随机：打乱整个列表，播完停止。')
+      .addDropdown((dropdown) => {
+        for (const mode of PLAYBACK_MODES) {
+          dropdown.addOption(mode, PLAYBACK_MODE_LABELS[mode]);
+        }
+        dropdown.setValue(this.msPlugin.settings.playbackMode).onChange((value) => {
+          this.msPlugin.setPlaybackMode(value as PlaybackMode);
+          this.display();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('自动用所在文件夹成列')
+      .setDesc('朗读整篇笔记时，如果它不在当前播放列表中，自动把同文件夹的笔记作为临时播放列表。')
+      .addToggle((toggle) =>
+        toggle.setValue(this.msPlugin.settings.autoFolderPlaylist).onChange((value) => {
+          void this.save('autoFolderPlaylist', value);
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName('文件夹导入包含子文件夹')
+      .setDesc('按文件夹导入或自动成列时，是否包含子文件夹里的笔记。')
+      .addToggle((toggle) =>
+        toggle.setValue(this.msPlugin.settings.playlistIncludeSubfolders).onChange((value) => {
+          void this.save('playlistIncludeSubfolders', value);
+        }),
+      );
+
+    new Setting(containerEl)
       .setName('每块字符数')
       .setDesc('默认 300。越大请求越少，但逐句高亮的估算误差越大；豆包会自动按 900 字节再切分。')
       .addSlider((slider) =>
@@ -533,6 +566,25 @@ export class MsTtsSettingsTab extends PluginSettingTab {
         toggle.setValue(this.msPlugin.settings.showStatusBar).onChange((value) => {
           void this.save('showStatusBar', value);
           this.msPlugin.refreshStatusBar();
+        }),
+      );
+  }
+
+  private renderPlaylists(containerEl: HTMLElement): void {
+    containerEl.createEl('h3', { text: '播放列表' });
+
+    const lists = this.msPlugin.playlist.getLists();
+    const active = this.msPlugin.playlist.getActiveList();
+    new Setting(containerEl)
+      .setName('播放列表管理')
+      .setDesc(
+        lists.length
+          ? `共有 ${lists.length} 个列表${active ? `，当前「${active.name}」共 ${active.items.length} 篇` : ''}。`
+          : '还没有播放列表。可以新建，或把当前笔记 / 文件夹加进来。',
+      )
+      .addButton((button) =>
+        button.setButtonText('管理播放列表').setCta().onClick(() => {
+          this.msPlugin.openPlaylistManager();
         }),
       );
   }

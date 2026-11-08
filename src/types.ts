@@ -2,6 +2,22 @@ export type ProviderId = 'edge' | 'doubao' | 'openai' | 'system';
 export type KeyStorage = 'local' | 'session';
 export type SecretName = 'doubao' | 'openai';
 
+export type PlaybackMode = 'sequential' | 'repeat-one' | 'repeat-all' | 'shuffle';
+export type QueueSource = 'playlist' | 'folder' | 'single' | 'partial';
+
+export interface PlaylistItem {
+  path: string;
+  title: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  items: PlaylistItem[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface MsTtsSettings {
   provider: ProviderId;
 
@@ -41,6 +57,13 @@ export interface MsTtsSettings {
   keyStorage: KeyStorage;
   openPanelOnPlay: boolean;
   showStatusBar: boolean;
+
+  // 播放模式与播放列表
+  playbackMode: PlaybackMode;
+  playlists: Playlist[];
+  activePlaylistId: string;
+  autoFolderPlaylist: boolean;
+  playlistIncludeSubfolders: boolean;
 }
 
 export interface VoiceOption {
@@ -91,4 +114,16 @@ export interface PlayerSnapshot {
   requests: number;
   provider: ProviderId;
   error?: string;
+}
+
+export interface PlaylistSnapshot {
+  mode: PlaybackMode;
+  listId: string;
+  listName: string;
+  source: QueueSource;
+  index: number;
+  count: number;
+  currentPath: string | null;
+  currentTitle: string;
+  isAdvancing: boolean;
 }

@@ -58,14 +58,16 @@
   transition: width 0.15s linear;
 }
 
-.ms-tts-controls {
+.ms-tts-controls,
+.ms-tts-playlist-controls {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
 
-.ms-tts-controls button {
+.ms-tts-controls button,
+.ms-tts-playlist-controls button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -79,11 +81,13 @@
   cursor: pointer;
 }
 
-.ms-tts-controls button:hover:not(:disabled) {
+.ms-tts-controls button:hover:not(:disabled),
+.ms-tts-playlist-controls button:hover:not(:disabled) {
   background-color: var(--background-modifier-active-hover);
 }
 
-.ms-tts-controls button:disabled {
+.ms-tts-controls button:disabled,
+.ms-tts-playlist-controls button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -100,12 +104,210 @@
 }
 
 .ms-tts-counter,
+.ms-tts-playlist-status,
 .ms-tts-meta {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
   word-break: break-word;
+}
+
+.ms-tts-playlist-controls .ms-tts-mode-button {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* 播放列表管理 */
+
+.ms-tts-playlist-modal .ms-tts-playlist-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ms-tts-playlist-modal .ms-tts-playlist-header select {
+  min-width: 180px;
+  flex: 1;
+}
+
+.ms-tts-playlist-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin: 4px 0 10px;
+}
+
+.ms-tts-playlist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 48vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 12px;
+}
+
+.ms-tts-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+}
+
+.ms-tts-playlist-item.is-current {
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.ms-tts-playlist-item.is-missing .ms-tts-playlist-item-title,
+.ms-tts-playlist-item.is-missing .ms-tts-playlist-item-path {
+  color: var(--text-warning);
+}
+
+.ms-tts-playlist-item-index {
+  min-width: 1.8em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: right;
+}
+
+.ms-tts-playlist-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ms-tts-playlist-item-title {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-tts-playlist-item-path {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-tts-playlist-item-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ms-tts-playlist-item-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.ms-tts-playlist-item-actions button:hover:not(:disabled) {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.ms-tts-playlist-item-actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ms-tts-playlist-options {
+  margin: 4px 0 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.ms-tts-playlist-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-tts-playlist-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ms-tts-playlist-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+/* 多选笔记 */
+
+.ms-tts-note-picker-modal .ms-tts-note-picker-search,
+.ms-tts-text-input {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.ms-tts-note-picker-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ms-tts-note-picker-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ms-tts-note-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ms-tts-note-picker-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.ms-tts-note-picker-row input {
+  margin: 0;
+}
+
+.ms-tts-note-picker-title {
+  flex-shrink: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.ms-tts-note-picker-path {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-tts-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .ms-tts-warning {
