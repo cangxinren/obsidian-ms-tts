@@ -2,8 +2,14 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    paths:
+      - 'manifest.json'
+      - 'src/**'
+      - 'styles.css'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: write
@@ -22,15 +28,32 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      - name: Read version
+        id: version
+        run: echo "version=$(node -p \"require('./manifest.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing tag
+        id: tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Package plugin
+        if: steps.tag.outputs.exists == 'false'
         run: |
           mkdir -p release
           cp main.js manifest.json styles.css release/
           cd release
-          zip -r "../ms-tts-reader-${GITHUB_REF_NAME}.zip" .
+          zip -r "../ms-tts-reader-v${{ steps.version.outputs.version }}.zip" .
 
       - uses: softprops/action-gh-release@v2
+        if: steps.tag.outputs.exists == 'false'
         with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           files: |
             main.js
             manifest.json

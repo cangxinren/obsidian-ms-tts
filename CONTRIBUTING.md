@@ -31,6 +31,13 @@ npm run build
 3. 提交前运行 `npm run check` 和 `npm run build`。
 4. 不要提交 `main.js`、`node_modules/` 或任何密钥。
 
+## 发布新版本
+
+1. 更新 `manifest.json`、`package.json` 与 `CHANGELOG.md` 中的版本号。
+2. 提交并推送到 `main`。
+
+GitHub Actions 会读取 `manifest.json` 的版本号；如果对应 `vX.Y.Z` 标签不存在，会自动构建并创建 Release（包含 `main.js`、`manifest.json`、`styles.css` 和 zip 包）。
+
 ## 代码结构
 
 - `src/providers/`：各语音引擎适配
