@@ -44,7 +44,7 @@
 ### 从 Release 安装（推荐）
 
 1. 打开 [最新 Release](https://github.com/cangxinren/obsidian-ms-tts/releases/latest)。
-2. 下载 `main.js`、`manifest.json`、`styles.css` 三个文件。
+2. 下载 `main.js`、`manifest.json`、`styles.css` 三个文件；也可以直接下载 `ms-tts-reader-v0.2.0.zip` 解压使用。
 3. 在笔记库中创建目录：
 
    ```text

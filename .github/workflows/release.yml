@@ -22,10 +22,18 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      - name: Package plugin
+        run: |
+          mkdir -p release
+          cp main.js manifest.json styles.css release/
+          cd release
+          zip -r "../ms-tts-reader-${GITHUB_REF_NAME}.zip" .
+
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             main.js
             manifest.json
             styles.css
+            ms-tts-reader-*.zip
           generate_release_notes: true
