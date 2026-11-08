@@ -30,7 +30,7 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "version=$(node -p \"require('./manifest.json').version\")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
 
       - name: Check existing tag
         id: tag
